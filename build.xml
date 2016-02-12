@@ -39,4 +39,13 @@
             <classpath refid="TruthTrees.classpath"/>
         </java>
     </target>
+	<target depends="build-project" name="jar">
+        <jar destfile="TruthTrees.jar" filesetmanifest="mergewithoutmain">
+            <manifest>
+                <attribute name="Main-Class" value="perl.aaron.TruthTrees.TruthTrees"/>
+                <attribute name="Class-Path" value="."/>
+            </manifest>
+            <fileset dir="bin"/>
+        </jar>
+    </target>
 </project>
