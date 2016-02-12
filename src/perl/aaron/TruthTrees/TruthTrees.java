@@ -20,6 +20,7 @@ import java.util.Date;
 import java.util.List;
 
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -231,19 +232,42 @@ public class TruthTrees {
 			}
 		});
 		
+		JMenuItem symbolsButton = new JMenuItem("Symbols");
+		symbolsButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				JOptionPane.showMessageDialog(null,
+				new JLabel("<html><body>" +
+				  "\u2228 : |<br>" +
+			      "\u2227 : &<br>" +
+			      "\u2192 : $<br>" +
+			      "\u2194 : %<br>" +
+			      "\u00AC : ~,!" +
+			    "</html></body>", JLabel.CENTER),
+				"Logical Symbols",
+				JOptionPane.PLAIN_MESSAGE);
+			}
+		});
+		helpMenu.add(symbolsButton);
+		
 		JMenuItem aboutButton = new JMenuItem("About");
 		aboutButton.addActionListener(new ActionListener() {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				JOptionPane.showMessageDialog(null,
-				  "TFTrees : Copyright Aaron Perl 2016\n"+
-				  "Version " + version + "\n" +
-				  "",
+				  new JLabel("<html><body>" +
+				    "TFTrees : Copyright Aaron Perl 2016<br>"+
+				    "Version " + version + "<br>" +
+				    "Repository : https://github.com/AaronPerl/TFTrees" +
+				  "</body></html>"),
 				  "About TFTrees",
 				  JOptionPane.PLAIN_MESSAGE);
 			}
 		});
+		
+		helpMenu.add(aboutButton);
 
 		frame.pack();
 		frame.setVisible(true);
