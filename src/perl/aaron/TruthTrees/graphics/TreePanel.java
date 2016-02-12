@@ -1,0 +1,756 @@
+package perl.aaron.TruthTrees.graphics;
+
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Insets;
+import java.awt.Point;
+import java.awt.Shape;
+import java.awt.Stroke;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.awt.event.InputEvent;
+import java.awt.event.InputMethodEvent;
+import java.awt.event.InputMethodListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.swing.ButtonModel;
+import javax.swing.JButton;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.UndoableEditListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Document;
+import javax.swing.text.DocumentFilter;
+import javax.swing.text.Element;
+import javax.swing.text.Position;
+import javax.swing.text.Segment;
+
+import perl.aaron.TruthTrees.Branch;
+import perl.aaron.TruthTrees.BranchLine;
+import perl.aaron.TruthTrees.BranchTerminator;
+import perl.aaron.TruthTrees.ExpressionParser;
+import perl.aaron.TruthTrees.logic.Statement;
+
+/**
+ * An extension of JPanel for displaying and interacting with a sequence of TreeLines
+ * @author Aaron Perl
+ *
+ */
+public class TreePanel extends JPanel {
+	private static final long serialVersionUID = 2267768929169530856L;
+
+	private Branch root;
+	private Point center;
+	private Point prevCenter;
+	private Point clickPoint;
+	private float size;
+	private int maxWidth;
+	private BranchLine editLine;
+	private Map<Branch, JButton> addBranchMap;
+	private Map<Branch, JButton> addLineMap;
+	private Map<Branch, JButton> branchMap;
+	private Map<Branch, JButton> terminateMap;
+	private Map<JTextField, BranchLine> lineMap;
+	private Map<BranchLine, JTextField> reverseLineMap;
+	private Set<BranchLine> selectedLines;
+	private Set<Branch> selectedBranches;
+	private Branch premises;
+	
+	public TreePanel()
+	{
+		this(true);
+	}
+	
+	public TreePanel(boolean addFirstLine)
+	{
+		super();
+		setLayout(null);
+		center = new Point(0,-50);
+		size = 12f;
+		maxWidth = 0;
+		editLine = null;
+		selectedLines = null;
+		selectedBranches = null;
+		addBranchMap = new HashMap<Branch, JButton>();
+		addLineMap = new HashMap<Branch, JButton>();
+		branchMap = new HashMap<Branch, JButton>();
+		terminateMap = new HashMap<Branch, JButton>();
+		lineMap = new HashMap<JTextField, BranchLine>();
+		reverseLineMap = new HashMap<BranchLine, JTextField>();
+		this.setFont(this.getFont().deriveFont(size));
+		premises = addBranch(null, false);
+		root = addBranch(premises, addFirstLine);
+		setFocusable(true);
+		addMouseListener(new MouseListener() {
+			
+			@Override
+			public void mouseReleased(MouseEvent e) {}
+			
+			@Override
+			public void mousePressed(MouseEvent e) {
+				prevCenter = center;
+				clickPoint = e.getPoint();
+				requestFocus();
+			}
+			
+			@Override
+			public void mouseExited(MouseEvent e) {}
+			
+			@Override
+			public void mouseEntered(MouseEvent e) {}
+			
+			@Override
+			public void mouseClicked(MouseEvent e) {}
+		});
+		addMouseMotionListener(new MouseMotionListener() {
+			
+			@Override
+			public void mouseMoved(MouseEvent e) {}
+			
+			@Override
+			public void mouseDragged(MouseEvent e) {
+				center = new Point(e.getPoint().x - clickPoint.x + prevCenter.x, e.getPoint().y - clickPoint.y + prevCenter.y);
+				moveComponents();
+			}
+		});
+		moveComponents();
+	}
+	
+	public void addPremise(Statement s)
+	{
+		BranchLine newLine = addLine(premises);
+		newLine.setIsPremise(true);
+		if (s != null)
+		{
+			newLine.setStatement(s);
+			reverseLineMap.get(newLine).setText(s.toString());
+			moveComponents();
+		}
+	}
+	
+	public void addPremise()
+	{
+		addPremise(null);
+	}
+	
+	private String checkLine(BranchLine l)
+	{
+		return l.verifyDecomposition();
+	}
+
+	private String checkBranch(Branch b)
+	{
+		for (int i = 0; i < b.numLines(); i++)
+		{
+			BranchLine curLine = b.getLine(i);
+			String ret = checkLine(curLine);
+			if (ret != null)
+				return ret;
+		}
+		for (Branch curBranch : b.getBranches())
+		{
+			String ret = checkBranch(curBranch);
+			if (ret != null)
+				return ret;
+		}
+		return null;
+	}
+	
+	public String check()
+	{
+		String checkRet = checkBranch(premises);
+		if (checkRet != null)
+			return checkRet;
+		return checkBranch(root);
+	}
+	
+	public String checkSelectedLine()
+	{
+		if (editLine != null)
+			return checkLine(editLine);
+		return "No statement is currently selected!";
+	}
+	
+	public Branch addBranch(Branch parent)
+	{
+		return addBranch(parent, true);
+	}
+	
+	public Branch addBranch(Branch parent, boolean addFirstLine)
+	{
+		Branch newBranch = new Branch(parent);
+		newBranch.setFontMetrics(getFontMetrics(getFont()));
+		makeButtonsForBranch(newBranch);
+		if (parent != null)
+			parent.addBranch(newBranch);
+		if (addFirstLine)
+			addLine(newBranch);
+		moveComponents();
+		repaint();
+		return newBranch;
+	}
+	
+	private void makeButtonsForBranch(Branch b)
+	{
+		final Branch myBranch = b;
+		JButton branchButton = new JButton("Branch");
+		JButton lineButton = new JButton("Line");
+		JButton terminateButton = new JButton("Terminate");
+		JButton decompButton = new JButton();
+		decompButton.setOpaque(false);
+		decompButton.setContentAreaFilled(false);
+		decompButton.setBorderPainted(false);
+		decompButton.setFocusable(false);
+		branchButton.setMargin(new Insets(1, 1, 1, 1));
+		lineButton.setMargin(new Insets(1, 1, 1, 1));
+		terminateButton.setMargin(new Insets(1, 1, 1, 1));
+		branchButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+//				if (myBranch.numLines() == 0) return;
+				addBranch(myBranch);
+			}
+		});
+		lineButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				addLine(myBranch);
+			}
+		});
+		terminateButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				addTerminator(myBranch);
+			}
+		});
+		decompButton.addMouseListener(new MouseListener() {
+			
+			@Override
+			public void mousePressed(MouseEvent e) {
+				if (selectedBranches != null &&
+				  (SwingUtilities.isRightMouseButton(e) || e.isControlDown()))
+				{
+					if (selectedBranches.contains(myBranch))
+						selectedBranches.remove(myBranch);
+					else
+						selectedBranches.add(myBranch);
+					TreePanel.this.repaint();
+				}
+			}
+
+			@Override
+			public void mouseClicked(MouseEvent e) {}
+
+			@Override
+			public void mouseEntered(MouseEvent e) {}
+
+			@Override
+			public void mouseExited(MouseEvent e) {}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {}
+		});
+		add(branchButton);
+		add(lineButton);
+		add(terminateButton);
+		add(decompButton);
+		addBranchMap.put(b, branchButton);
+		addLineMap.put(b, lineButton);
+		branchMap.put(b, decompButton);
+		terminateMap.put(b, terminateButton);
+	}
+	
+	private boolean isSelected(BranchLine b)
+	{
+		if (selectedLines != null)
+			return selectedLines.contains(b);
+		return false;
+	}
+	
+	private void toggleSelected(BranchLine b, Set<BranchLine> curSelected)
+	{
+		if (curSelected.contains(b))
+		{
+			curSelected.remove(b);
+			reverseLineMap.get(b).setBackground(BranchLine.DEFAULT_COLOR);
+			if (!(editLine instanceof BranchTerminator))
+				b.setDecomposedFrom(null);
+		}
+		else
+		{
+			curSelected.add(b);
+			reverseLineMap.get(b).setBackground(BranchLine.SELECTED_COLOR);
+			if (!(editLine instanceof BranchTerminator))
+				b.setDecomposedFrom(editLine);
+		}
+	}
+	
+	private void toggleSelected(BranchLine b)
+	{
+		toggleSelected(b, selectedLines);
+	}
+	
+	private void moveBranch(Branch b, Point origin)
+	{
+		int verticalOffset = 0;
+		int maxLineWidth = b.getWidestLine();
+		int maxWidth = b.getWidestChild();
+		for (int i = 0; i < b.numLines(); i++)
+		{
+			BranchLine curLine = b.getLine(i);
+			JTextField curField = reverseLineMap.get(curLine);
+//			if (curField == null)
+//			{
+//				System.out.println(curLine.toString());
+//				System.exit(-1);
+//			}
+			if (isSelected(curLine))
+				curField.setBackground(BranchLine.SELECTED_COLOR);
+			else if (curLine == editLine)
+				curField.setBackground(BranchLine.EDIT_COLOR);
+			else
+				curField.setBackground(BranchLine.DEFAULT_COLOR);
+			curField.setBounds(	origin.x - maxLineWidth/2, origin.y + verticalOffset,
+								maxLineWidth, b.getLineHeight());
+			curField.repaint();
+			verticalOffset += b.getLineHeight();
+		}
+		if (b != premises)
+		{
+			JButton lineButton = addLineMap.get(b);
+			JButton addButton = addBranchMap.get(b);
+			JButton branchButton = branchMap.get(b);
+			JButton terminateButton = terminateMap.get(b);
+			int horizontalOffset = (maxWidth + Branch.BRANCH_SEPARATION) * (b.getBranches().size()-1);
+			horizontalOffset /= -2;
+			if (!b.isTerminated())
+			{
+				lineButton.setBounds(origin.x - maxLineWidth/2, origin.y + verticalOffset,
+						maxLineWidth, b.getLineHeight());
+				verticalOffset += b.getLineHeight();
+				addButton.setBounds(origin.x - maxLineWidth/2, origin.y + verticalOffset,
+									maxLineWidth, b.getLineHeight());
+				verticalOffset += b.getLineHeight();
+				if (b.getBranches().size() == 0)
+				{
+					terminateButton.setBounds(origin.x - maxLineWidth/2, origin.y + verticalOffset,
+						maxLineWidth, b.getLineHeight());
+					terminateButton.setVisible(true);
+					terminateButton.setEnabled(true);
+					verticalOffset += b.getLineHeight();
+				}
+				else
+				{
+					terminateButton.setVisible(false);
+					terminateButton.setEnabled(false);
+				}
+				terminateButton.repaint();
+				branchButton.setBounds(	origin.x + horizontalOffset - maxWidth/2, origin.y + verticalOffset,
+										-horizontalOffset * 2 + maxWidth, Branch.VERTICAL_GAP);
+				addButton.setVisible(true);
+				addButton.setEnabled(true);
+				lineButton.setVisible(true);
+				lineButton.setEnabled(true);
+				branchButton.setEnabled(true);
+			}
+			else
+			{
+				addButton.setVisible(false);
+				addButton.setEnabled(false);
+				lineButton.setVisible(false);
+				lineButton.setEnabled(false);
+				branchButton.setEnabled(false);
+				terminateButton.setVisible(false);
+				terminateButton.setEnabled(false);
+			}
+			addButton.repaint();
+			lineButton.repaint();
+			branchButton.repaint();
+			terminateButton.repaint();
+			verticalOffset += Branch.VERTICAL_GAP;
+			for (Branch curChild : b.getBranches())
+			{
+				moveBranch(curChild, new Point(origin.x + horizontalOffset, origin.y + verticalOffset));
+				horizontalOffset += (maxWidth + Branch.BRANCH_SEPARATION);
+			}
+		}
+	}
+	
+	public void moveComponents()
+	{
+		Point origin = new Point(center.x + getWidth()/2, center.y + getHeight()/2);
+		if (premises != null)
+		{
+			moveBranch(premises, origin);
+			origin.translate(0, premises.getLineHeight() * premises.numLines());
+		}
+		origin.translate(0, 20);
+		if (root != null)
+			moveBranch(root, origin);
+	}
+	
+	public Dimension getPreferredSize()
+	{
+		return new Dimension(800, 600);
+	}
+	
+	private BranchLine addLine(final Branch b)
+	{
+		return addLine(b, false);
+	}
+	
+	private BranchLine addLine(final Branch b, final boolean isTerminator)
+	{
+		final BranchLine newLine;
+		if (isTerminator)
+		{
+			newLine = new BranchTerminator(b);
+			b.addTerminator((BranchTerminator)newLine);
+		}
+		else
+			newLine = b.addStatement(null);
+		final JTextField newField = new JTextField("");
+		if (isTerminator)
+		{
+			newField.setText(newLine.toString());
+			newField.setForeground(new Color(0.7f, 0.0f, 0.0f));
+		}
+		if (b == premises)
+			newLine.setIsPremise(true);
+		newField.setEditable(false);
+		newField.setFocusable(false);
+		newField.setHorizontalAlignment(JTextField.CENTER);
+		newField.setFont(this.getFont().deriveFont(size));
+		((AbstractDocument) newField.getDocument()).setDocumentFilter(new DocumentFilter() {
+			public void insertString(	DocumentFilter.FilterBypass fb,
+										int offset, String string, AttributeSet attr)
+												throws BadLocationException
+			{
+				if (string.equals("$"))
+					super.insertString(fb, offset, "\u2192", attr);
+				else
+					super.insertString(fb, offset, string, attr);
+			}
+			public void remove(DocumentFilter.FilterBypass fb, int offset, int length)
+					throws BadLocationException
+			{
+				super.remove(fb, offset, length);
+			}
+			public void replace(	DocumentFilter.FilterBypass fb,
+									int offset, int length, String text, AttributeSet attrs)
+											throws BadLocationException
+			{
+				if (text.equals("$"))
+					super.replace(fb, offset, length, "\u2192", attrs);
+				else if (text.equals("%"))
+					super.replace(fb, offset, length, "\u2194", attrs);
+				else
+					super.replace(fb, offset, length, text, attrs);
+				
+			}
+		});
+		newField.addMouseListener(new MouseListener() {
+			
+			@Override
+			public void mouseReleased(MouseEvent e) {}
+			
+			@Override
+			public void mousePressed(MouseEvent e) {
+				if (SwingUtilities.isLeftMouseButton(e) && !e.isControlDown())
+				{
+					if (editLine != null)
+					{
+						reverseLineMap.get(editLine).setEditable(false);
+						reverseLineMap.get(editLine).setFocusable(false);
+					}
+					if (!isTerminator)
+					{
+						newField.setEditable(true);
+						newField.setFocusable(true);
+					}
+					newField.requestFocus();
+					editLine = lineMap.get(newField);
+					selectedLines = lineMap.get(newField).getSelectedLines();
+					selectedBranches = lineMap.get(newField).getSelectedBranches();
+					moveComponents();
+					repaint();
+				}
+				else if (SwingUtilities.isRightMouseButton(e) || e.isControlDown())
+				{
+					BranchLine curLine = lineMap.get(newField);
+					if (editLine != curLine && editLine != null &&
+							(editLine == curLine.getDecomposedFrom() || curLine.getDecomposedFrom() == null || editLine instanceof BranchTerminator))
+						toggleSelected(curLine);
+				}
+				
+			}
+			
+			@Override
+			public void mouseExited(MouseEvent e) {}
+			
+			@Override
+			public void mouseEntered(MouseEvent e) {}
+			
+			@Override
+			public void mouseClicked(MouseEvent e) {}
+		});
+		newField.addKeyListener(new KeyListener() {
+			
+			@Override
+			public void keyTyped(KeyEvent e) {
+				TreePanel.this.dispatchEvent(e);
+			}
+			
+			@Override
+			public void keyReleased(KeyEvent e) {
+				TreePanel.this.dispatchEvent(e);
+			}
+			
+			@Override
+			public void keyPressed(KeyEvent e) {
+				if (e.getKeyChar() == KeyEvent.VK_ENTER)
+				{
+					TreePanel.this.requestFocus();
+				}
+				TreePanel.this.dispatchEvent(e);
+			}
+		});
+		// Parse the statement when focus is lost
+		newField.addFocusListener(new FocusListener() {
+			
+			@Override
+			public void focusLost(FocusEvent e) {
+				Statement newStatement = ExpressionParser.parseExpression(newField.getText());
+				if (newStatement != null)
+				{
+					newLine.setStatement(newStatement);
+					b.calculateWidestLine();
+					newField.setText(newStatement.toString());
+				}
+				else
+				{
+					if (!newField.getText().equals(""))
+					{
+						if (newLine.getStatement() != null)
+							newField.setText(newLine.toString());
+						else
+							newField.setText("");
+						JOptionPane.showMessageDialog(	null, "Error: Invalid logical statement",
+													"Error", JOptionPane.ERROR_MESSAGE);
+					}
+					else
+						newLine.setStatement(null);
+				}
+				moveComponents();
+			}
+			
+			@Override
+			public void focusGained(FocusEvent e) {
+				// TODO Auto-generated method stub
+				
+			}
+		});
+		lineMap.put(newField, newLine);
+		reverseLineMap.put(newLine, newField);
+		add(newField);
+		moveComponents();
+		newField.setEditable(false);
+		return newLine;
+	}
+	
+	public BranchLine addStatement(Branch b, Statement s)
+	{
+		BranchLine newLine = addLine(b);
+		newLine.setStatement(s);
+		reverseLineMap.get(newLine).setText(s.toString());
+		moveComponents();
+		return newLine;
+	}
+	
+	// temporary
+	public void addStatement(Statement s)
+	{
+		addStatement(root, s);
+	}
+	
+	public BranchTerminator addTerminator(Branch b)
+	{
+		return (BranchTerminator) addLine(b, true);
+	}
+	
+	public void drawBranching(Branch b, Graphics2D g)
+	{
+		if (selectedBranches != null && selectedBranches.contains(b))
+			g.setColor(BranchLine.SELECTED_COLOR);
+		else
+			g.setColor(BranchLine.DEFAULT_COLOR);
+		JButton addButton = addBranchMap.get(b);
+		if (addButton != null)
+		{
+			int midX = addButton.getX() + addButton.getWidth()/2;
+			int topY = (int) addButton.getBounds().getMaxY();
+			if (b.getBranches().size() > 1)
+			{
+				int midY = topY + Branch.VERTICAL_GAP/2;
+				int bottomY = topY + Branch.VERTICAL_GAP;
+				int leftX = (b.getWidestChild() + Branch.BRANCH_SEPARATION) * (b.getBranches().size()-1);
+				leftX /= 2;
+				leftX = midX - leftX;
+				int rightX = leftX + (b.getWidestChild() + Branch.BRANCH_SEPARATION) * (b.getBranches().size() - 1);
+				g.drawLine(midX, topY, midX, midY);
+				g.drawLine(leftX, midY, rightX, midY);
+				int curX = leftX;
+				for (Branch curBranch : b.getBranches())
+				{
+					g.drawLine(curX, midY, curX, bottomY);
+					curX += (b.getWidestChild() + Branch.BRANCH_SEPARATION);
+					if (curBranch.getBranches().size() > 0)
+						drawBranching(curBranch, g);
+				}
+			}
+			else
+				g.drawLine(midX, topY, midX, topY + Branch.VERTICAL_GAP);
+		}
+	}
+	
+	public void paintComponent(Graphics g)
+	{
+		super.paintComponent(g);
+		Graphics2D g2d = (Graphics2D) g;
+		g2d.setColor(new Color(1.0f,1.0f,1.0f));
+		g2d.fillRect(0, 0, getWidth(), getHeight());
+		g2d.setColor(new Color(0.0f, 0.0f, 0.0f));
+		g2d.setStroke(new BasicStroke(4.0f));
+		if (root.getBranches().size() > 0)
+			drawBranching(root, g2d);
+	}
+	
+	public Branch getRootBranch()
+	{
+		return root;
+	}
+	
+	public void setRoot(Branch newRoot)
+	{
+		root = newRoot;
+		root.setFontMetrics(this.getFontMetrics(this.getFont()));
+		root.getWidth();
+	}
+	
+	/**
+	 * Removes a line from the tree
+	 * @param removedLine The line to remove
+	 */
+	private void removeLine(BranchLine removedLine)
+	{
+		BranchLine decomposedFrom = removedLine.getDecomposedFrom();
+		if (decomposedFrom != null)
+		{
+			toggleSelected(removedLine, decomposedFrom.getSelectedLines());
+		}
+		if (!(removedLine instanceof BranchTerminator))
+			for (BranchLine curLine : removedLine.getSelectedLines())
+				curLine.setDecomposedFrom(null);
+		int removeIndex = -1;
+		for (int i = 0; i < removedLine.getParent().numLines(); i++)
+		{
+			if (removedLine.getParent().getLine(i) == removedLine)
+			{
+				removeIndex = i;
+				break;
+			}
+		}
+		removedLine.getParent().removeLine(removeIndex);
+		JTextField removedField = reverseLineMap.get(removedLine);
+		this.remove(removedField);
+		lineMap.remove(removedField);
+		reverseLineMap.remove(removedLine);
+	}
+	
+	/**
+	 * Unselects the currently selected line, modifying the context as such
+	 */
+	private void deselectCurrentLine()
+	{
+		editLine = null;
+		selectedBranches = null;
+		selectedLines = null;
+	}
+	
+	/**
+	 * Deletes the currently selected line
+	 */
+	public void deleteCurrentLine()
+	{
+		if (editLine == null && !editLine.isPremise())
+			return;
+		removeLine(editLine);
+		deselectCurrentLine();
+		moveComponents();
+		repaint();
+	}
+	
+	/**
+	 * Removes a branch from the tree, deleting all references and removing its children
+	 * @param b The branch to be removed
+	 */
+	private void deleteBranch(Branch b)
+	{
+		for (Branch curChild : b.getBranches())
+			deleteBranch(curChild);
+		for (int i = 0; i < b.numLines(); i++)
+		{
+			removeLine(b.getLine(i));
+		}
+		remove(addBranchMap.get(b));
+		addBranchMap.remove(b);
+		remove(addLineMap.get(b));
+		addLineMap.remove(b);
+		remove(branchMap.get(b));
+		branchMap.remove(b);
+		remove(terminateMap.get(b));
+		terminateMap.remove(b);
+		b.getRoot().removeBranch(b);
+	}
+	
+	/**
+	 * Deletes the currently selected branch
+	 * @return : False if the current branch is the root branch, true otherwise
+	 */
+	public boolean deleteCurrentBranch()
+	{
+		Branch selectedBranch = editLine.getParent();
+		if (selectedBranch == root || selectedBranch == premises)
+			return false;
+		deleteBranch(selectedBranch);
+		deselectCurrentLine();
+		moveComponents();
+		repaint();
+		return true;
+	}
+	
+}
