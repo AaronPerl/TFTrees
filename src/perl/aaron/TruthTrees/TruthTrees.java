@@ -116,6 +116,7 @@ public class TruthTrees {
 		
 		JMenuBar menuBar = new JMenuBar();
 		JMenu fileMenu = new JMenu("File");
+		JMenu editMenu = new JMenu("Edit");
 		JMenu treeMenu = new JMenu("Tree");
 		JMenu helpMenu = new JMenu("Help");
 		TreePanel treePanel = new TreePanel();
@@ -124,6 +125,7 @@ public class TruthTrees {
 		System.out.println(frame.getContentPane().getComponent(0) == treePanel);
 		frame.setJMenuBar(menuBar);
 		menuBar.add(fileMenu);
+		menuBar.add(editMenu);
 		menuBar.add(treeMenu);
 		menuBar.add(helpMenu);
 		
@@ -169,6 +171,30 @@ public class TruthTrees {
 			public void actionPerformed(ActionEvent e) {
 				FileManager.saveFile((TreePanel)frame.getContentPane().getComponent(0));
 				
+			}
+		});
+		
+		JMenuItem undoButton = new JMenuItem("Undo");
+		
+		editMenu.add(undoButton);
+		undoButton.setAccelerator(KeyStroke.getKeyStroke('Z', InputEvent.CTRL_MASK));
+		undoButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				((TreePanel)frame.getContentPane().getComponent(0)).undoState();
+			}
+		});
+		
+		JMenuItem redoButton = new JMenuItem("Redo");
+		
+		editMenu.add(redoButton);
+		redoButton.setAccelerator(KeyStroke.getKeyStroke('Y', InputEvent.CTRL_MASK));
+		redoButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				((TreePanel)frame.getContentPane().getComponent(0)).redoState();
 			}
 		});
 		

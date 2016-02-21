@@ -297,7 +297,10 @@ public class Branch {
 				calculateWidestLine();
 			else
 				return MIN_WIDTH;
-		return Math.max(widestLine.getWidth(fm) + 2 * Branch.LABEL_BORDER, MIN_WIDTH);
+		if (widestLine != null)
+			return Math.max(widestLine.getWidth(fm) + 2 * Branch.LABEL_BORDER, MIN_WIDTH);
+		else
+			return 0;
 	}
 	
 	/**
@@ -336,5 +339,29 @@ public class Branch {
 				return true;
 		}
 		return false;
+	}
+	
+	/**
+	 * Returns a recursive deep copy of this branch
+	 * @return The copy of this branch
+	 */
+	public Branch deepCopy()
+	{
+		return deepCopy(null);
+	}
+	
+	private Branch deepCopy(Branch parent)
+	{
+		Branch copy = new Branch(parent);
+		copy.setFontMetrics(fm);
+		for (BranchLine l : lines)
+		{
+			copy.addStatement(l.getStatement());
+		}
+		for (Branch b : branches)
+		{
+			copy.addBranch(b.deepCopy(copy));
+		}
+		return copy;
 	}
 }

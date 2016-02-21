@@ -23,7 +23,9 @@ import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -32,6 +34,7 @@ import java.util.Set;
 
 import javax.swing.ButtonModel;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -39,6 +42,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.ListDataEvent;
 import javax.swing.event.UndoableEditListener;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
@@ -61,7 +65,10 @@ import perl.aaron.TruthTrees.logic.Statement;
  *
  */
 public class TreePanel extends JPanel {
+	
 	private static final long serialVersionUID = 2267768929169530856L;
+	private static final int UNDO_STACK_SIZE = 32;
+	private static final int REDO_STACK_SIZE = 32;
 
 	private Branch root;
 	private Point center;
@@ -79,6 +86,8 @@ public class TreePanel extends JPanel {
 	private Set<BranchLine> selectedLines;
 	private Set<Branch> selectedBranches;
 	private Branch premises;
+	private Deque<Branch> undoStack;
+	private Deque<Branch> redoStack;
 	
 	public TreePanel()
 	{
@@ -103,7 +112,11 @@ public class TreePanel extends JPanel {
 		reverseLineMap = new HashMap<BranchLine, JTextField>();
 		this.setFont(this.getFont().deriveFont(size));
 		premises = addBranch(null, false);
+		undoStack = new ArrayDeque<Branch>(UNDO_STACK_SIZE);
+		redoStack = new ArrayDeque<Branch>(REDO_STACK_SIZE);
+		
 		root = addBranch(premises, addFirstLine);
+		
 		setFocusable(true);
 		addMouseListener(new MouseListener() {
 			
@@ -140,8 +153,180 @@ public class TreePanel extends JPanel {
 		moveComponents();
 	}
 	
+	private void recordState()
+	{
+		if (premises != null)
+		{
+			Branch treeCopy = premises.deepCopy();
+
+			Map<BranchLine, BranchLine> lineMap = new HashMap<BranchLine, BranchLine>();
+			Map<Branch, Branch> branchMap = new HashMap<Branch, Branch>();
+			
+			mapNewToOld(premises, treeCopy, lineMap, branchMap);
+			addLineReferences(lineMap, branchMap);
+			
+			undoStack.push(treeCopy);
+			redoStack = new ArrayDeque<>();
+		}
+	}
+	
+	/**
+	 * Maps every item in a copy of a branch to the corresponding item in the original
+	 * @param oldBranch The original branch
+	 * @param newBranch The copy of the original branch
+	 * @param lineMap A map of old lines to new lines to be populated
+	 * @param branchMap A map of old branches to new branches to be populated
+	 */
+	private void mapNewToOld(Branch oldBranch, Branch newBranch,
+	  Map<BranchLine, BranchLine> lineMap,
+	  Map<Branch, Branch> branchMap)
+	{
+		branchMap.put(oldBranch, newBranch);
+		for (int i = 0; i < oldBranch.numLines(); i++)
+		{
+			lineMap.put(oldBranch.getLine(i), newBranch.getLine(i));
+		}
+		Iterator<Branch> oldIter = oldBranch.getBranches().iterator();
+		Iterator<Branch> newIter = newBranch.getBranches().iterator();
+		while (oldIter.hasNext())
+		{
+			mapNewToOld(oldIter.next(), newIter.next(), lineMap, branchMap);
+		}
+	}
+	
+	/**
+	 * Adds all references (decompositions, etc.) from lines in a tree to a copy
+	 * of that tree, updating them to point to the components in the copy
+	 * @param lineMap The map of old lines to each corresponding lines in the copy
+	 * @param branchMap The map of branches to each corresponding branch in the copy
+	 */
+	private void addLineReferences(Map<BranchLine, BranchLine> lineMap,
+	  Map<Branch, Branch> branchMap)
+	{
+		for (BranchLine oldLine : lineMap.keySet())
+		{
+			BranchLine newLine = lineMap.get(oldLine);
+			
+			BranchLine oldDecomposedFrom = oldLine.getDecomposedFrom();
+			BranchLine newDecomposedFrom = lineMap.get(oldDecomposedFrom);
+			newLine.setDecomposedFrom(newDecomposedFrom);
+			
+			Set<BranchLine> oldSelectedLineSet = oldLine.getSelectedLines();
+			Set<BranchLine> newSelectedLineSet = newLine.getSelectedLines();
+			for (BranchLine oldSelected : oldSelectedLineSet)
+			{
+				BranchLine newSelected = lineMap.get(oldSelected);
+				newSelectedLineSet.add(newSelected);
+			}
+			
+			Set<Branch> oldSelectedBranchSet = oldLine.getSelectedBranches();
+			Set<Branch> newSelectedBranchSet = newLine.getSelectedBranches();
+			for (Branch oldSelected : oldSelectedBranchSet)
+			{
+				Branch newSelected = branchMap.get(oldSelected);
+				newSelectedBranchSet.add(newSelected);
+			}
+			
+			newLine.setIsPremise(oldLine.isPremise());			
+		}
+	}
+	
+	/**
+	 * Undoes the previous state change.
+	 */
+	public void undoState()
+	{
+		if (!undoStack.isEmpty())
+		{
+			redoStack.push(premises.deepCopy());
+			premises = undoStack.pop();
+			root = premises.getBranches().iterator().next();
+			editLine = null;
+			resetAllComponents();
+			moveComponents();
+			repaint();
+		}
+	}
+	
+	/**
+	 * Performs the previously undone state change again
+	 */
+	public void redoState()
+	{
+		if (!redoStack.isEmpty())
+		{
+			undoStack.push(premises.deepCopy());
+			premises = redoStack.pop();
+			root = premises.getBranches().iterator().next();
+			editLine = null;
+			resetAllComponents();
+			moveComponents();
+			repaint();
+		}
+	}
+	
+	/**
+	 * Deletes all components saved and recreates them for the current tree.
+	 */
+	private void resetAllComponents()
+	{
+		deleteAllButtons();
+		
+		addBranchMap = new HashMap<Branch, JButton>();
+		addLineMap = new HashMap<Branch, JButton>();
+		branchMap = new HashMap<Branch, JButton>();
+		terminateMap = new HashMap<Branch, JButton>();
+		lineMap = new HashMap<JTextField, BranchLine>();
+		reverseLineMap = new HashMap<BranchLine, JTextField>();
+		
+		addComponentsRecursively(premises);
+	}
+	
+	/**
+	 * Deletes all of the components associated with the tree.
+	 */
+	private void deleteAllButtons()
+	{
+		removeComponentsInMap(addBranchMap);
+		removeComponentsInMap(addLineMap);
+		removeComponentsInMap(branchMap);
+		removeComponentsInMap(terminateMap);
+		removeComponentsInMap(reverseLineMap);
+	}
+	
+	/**
+	 * Removes all components in the value set of a map from this panel.
+	 * @param componentMap The map of objects to components to remove.
+	 */
+	private void removeComponentsInMap(Map<? extends Object, ? extends JComponent> componentMap)
+	{
+		for (JComponent comp : componentMap.values())
+		{
+			remove(comp);
+		}
+	}
+	
+	/**
+	 * Creates all associated component for a given branch and its ancestors
+	 * @param b The branch to recursively create components for
+	 */
+	private void addComponentsRecursively(Branch b)
+	{
+		makeButtonsForBranch(b);
+		for (int i = 0; i < b.numLines(); i++)
+		{
+			BranchLine line = b.getLine(i);
+			makeTextFieldForLine(line, b, line instanceof BranchTerminator);
+		}
+		for (Branch child : b.getBranches())
+		{
+			addComponentsRecursively(child);
+		}
+	}
+	
 	public void addPremise(Statement s)
 	{
+		recordState();
 		BranchLine newLine = addLine(premises);
 		newLine.setIsPremise(true);
 		if (s != null)
@@ -202,6 +387,7 @@ public class TreePanel extends JPanel {
 	
 	public Branch addBranch(Branch parent, boolean addFirstLine)
 	{
+		recordState();
 		Branch newBranch = new Branch(parent);
 		newBranch.setFontMetrics(getFontMetrics(getFont()));
 		makeButtonsForBranch(newBranch);
@@ -425,6 +611,7 @@ public class TreePanel extends JPanel {
 	
 	private BranchLine addLine(final Branch b, final boolean isTerminator)
 	{
+		recordState();
 		final BranchLine newLine;
 		if (isTerminator)
 		{
@@ -433,14 +620,23 @@ public class TreePanel extends JPanel {
 		}
 		else
 			newLine = b.addStatement(null);
+		makeTextFieldForLine(newLine, b, isTerminator);
+		moveComponents();
+		return newLine;
+	}
+	
+	private void makeTextFieldForLine(final BranchLine line, final Branch b, final boolean isTerminator)
+	{
 		final JTextField newField = new JTextField("");
+		if (line.getStatement() != null)
+			newField.setText(line.getStatement().toString());
 		if (isTerminator)
 		{
-			newField.setText(newLine.toString());
+			newField.setText(line.toString());
 			newField.setForeground(new Color(0.7f, 0.0f, 0.0f));
 		}
 		if (b == premises)
-			newLine.setIsPremise(true);
+			line.setIsPremise(true);
 		newField.setEditable(false);
 		newField.setFocusable(false);
 		newField.setHorizontalAlignment(JTextField.CENTER);
@@ -452,6 +648,8 @@ public class TreePanel extends JPanel {
 			{
 				if (string.equals("$"))
 					super.insertString(fb, offset, "\u2192", attr);
+				else if (string.equals("%"))
+					super.insertString(fb, offset, "\u2194", attr);
 				else
 					super.insertString(fb, offset, string, attr);
 			}
@@ -547,7 +745,9 @@ public class TreePanel extends JPanel {
 				Statement newStatement = ExpressionParser.parseExpression(newField.getText());
 				if (newStatement != null)
 				{
-					newLine.setStatement(newStatement);
+					if (newField.getParent() != null) // Ensures that the state isn't recorded twice when deleting a branch
+						recordState();
+					line.setStatement(newStatement);
 					b.calculateWidestLine();
 					newField.setText(newStatement.toString());
 				}
@@ -555,31 +755,30 @@ public class TreePanel extends JPanel {
 				{
 					if (!newField.getText().equals(""))
 					{
-						if (newLine.getStatement() != null)
-							newField.setText(newLine.toString());
+						if (line.getStatement() != null)
+							newField.setText(line.toString());
 						else
 							newField.setText("");
 						JOptionPane.showMessageDialog(	null, "Error: Invalid logical statement",
 													"Error", JOptionPane.ERROR_MESSAGE);
 					}
 					else
-						newLine.setStatement(null);
+					{
+						if (newField.getParent() != null) // Ensures that the state isn't recorded twice when deleting a branch
+							recordState();
+						line.setStatement(null);
+					}
 				}
 				moveComponents();
 			}
 			
 			@Override
-			public void focusGained(FocusEvent e) {
-				// TODO Auto-generated method stub
-				
-			}
+			public void focusGained(FocusEvent e) {}
 		});
-		lineMap.put(newField, newLine);
-		reverseLineMap.put(newLine, newField);
+		lineMap.put(newField, line);
+		reverseLineMap.put(line, newField);
 		add(newField);
-		moveComponents();
 		newField.setEditable(false);
-		return newLine;
 	}
 	
 	public BranchLine addStatement(Branch b, Statement s)
@@ -667,6 +866,7 @@ public class TreePanel extends JPanel {
 	 */
 	private void removeLine(BranchLine removedLine)
 	{
+		recordState();
 		BranchLine decomposedFrom = removedLine.getDecomposedFrom();
 		if (decomposedFrom != null)
 		{
@@ -720,6 +920,7 @@ public class TreePanel extends JPanel {
 	 */
 	private void deleteBranch(Branch b)
 	{
+		recordState();
 		for (Branch curChild : b.getBranches())
 			deleteBranch(curChild);
 		for (int i = 0; i < b.numLines(); i++)
@@ -745,7 +946,12 @@ public class TreePanel extends JPanel {
 	{
 		Branch selectedBranch = editLine.getParent();
 		if (selectedBranch == root || selectedBranch == premises)
+		{
+			JOptionPane.showMessageDialog(null,
+					"Cannot delete root and premise branches!",
+					"Delete branch error", JOptionPane.ERROR_MESSAGE);
 			return false;
+		}
 		deleteBranch(selectedBranch);
 		deselectCurrentLine();
 		moveComponents();
