@@ -111,11 +111,11 @@ public class TreePanel extends JPanel {
 		lineMap = new HashMap<JTextField, BranchLine>();
 		reverseLineMap = new HashMap<BranchLine, JTextField>();
 		this.setFont(this.getFont().deriveFont(size));
-		premises = addBranch(null, false);
+		premises = addBranch(null, addFirstLine);
 		undoStack = new ArrayDeque<Branch>(UNDO_STACK_SIZE);
 		redoStack = new ArrayDeque<Branch>(REDO_STACK_SIZE);
 		
-		root = addBranch(premises, addFirstLine);
+		root = addBranch(premises, false);
 		
 		setFocusable(true);
 		addMouseListener(new MouseListener() {

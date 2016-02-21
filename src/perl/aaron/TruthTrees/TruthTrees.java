@@ -132,7 +132,7 @@ public class TruthTrees {
 		JMenuItem checkButton = new JMenuItem("Check Tree");
 		
 		treeMenu.add(checkButton);
-		checkButton.setAccelerator(KeyStroke.getKeyStroke('C', InputEvent.CTRL_MASK));
+		checkButton.setAccelerator(KeyStroke.getKeyStroke('T', InputEvent.CTRL_MASK));
 		checkButton.addActionListener(new ActionListener() {
 			
 			@Override
@@ -231,7 +231,7 @@ public class TruthTrees {
 			}
 		});
 		
-		JMenuItem deleteBranchButton = new JMenuItem("Delecte Current Branch");
+		JMenuItem deleteBranchButton = new JMenuItem("Delete Current Branch");
 		
 		treeMenu.add(deleteBranchButton);
 		deleteBranchButton.setAccelerator(KeyStroke.getKeyStroke('D', InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK));
