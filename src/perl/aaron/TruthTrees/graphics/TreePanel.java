@@ -97,6 +97,8 @@ public class TreePanel extends JPanel {
 	public TreePanel(boolean addFirstLine)
 	{
 		super();
+		setOpaque(false);
+		setBackground(new Color(0,0,0,0));
 		setLayout(null);
 		center = new Point(0,-50);
 		size = 12f;
@@ -148,6 +150,8 @@ public class TreePanel extends JPanel {
 			public void mouseDragged(MouseEvent e) {
 				center = new Point(e.getPoint().x - clickPoint.x + prevCenter.x, e.getPoint().y - clickPoint.y + prevCenter.y);
 				moveComponents();
+				validate();
+				repaint();
 			}
 		});
 		moveComponents();
@@ -403,8 +407,8 @@ public class TreePanel extends JPanel {
 	private void makeButtonsForBranch(Branch b)
 	{
 		final Branch myBranch = b;
-		JButton branchButton = new JButton("Branch");
-		JButton lineButton = new JButton("Line");
+		JButton branchButton = new JButton("Add Branch");
+		JButton lineButton = new JButton("Add Line");
 		JButton terminateButton = new JButton("Terminate");
 		JButton decompButton = new JButton();
 		decompButton.setOpaque(false);
@@ -839,13 +843,40 @@ public class TreePanel extends JPanel {
 	public void paintComponent(Graphics g)
 	{
 		super.paintComponent(g);
+		g.setClip(0, 0, getWidth(), getHeight());
 		Graphics2D g2d = (Graphics2D) g;
 		g2d.setColor(new Color(1.0f,1.0f,1.0f));
 		g2d.fillRect(0, 0, getWidth(), getHeight());
 		g2d.setColor(new Color(0.0f, 0.0f, 0.0f));
 		g2d.setStroke(new BasicStroke(4.0f));
+		
+		drawStringAt(g2d,
+		  new Point(center.x + getWidth()/2, center.y + getHeight()/2),
+		  "Premises");
+		
+		drawStringAt(g2d,
+		  new Point(center.x + getWidth()/2,
+		    center.y + getHeight()/2 +
+		    premises.numLines() * premises.getLineHeight() +
+		    Branch.VERTICAL_GAP
+		  ),
+		  "Decomposition");
+		
 		if (root.getBranches().size() > 0)
 			drawBranching(root, g2d);
+	}
+	
+	private void drawStringAt(Graphics2D g2d, Point p, String toDraw)
+	{
+		FontMetrics fm = g2d.getFontMetrics();
+		
+		int centerX = p.x;
+		int bottomY = p.y;
+		
+		int textX = centerX - fm.stringWidth(toDraw) / 2;
+		int textY = bottomY - fm.getDescent() - fm.getLeading();
+		
+		g2d.drawString(toDraw, textX, textY);
 	}
 	
 	public Branch getRootBranch()
