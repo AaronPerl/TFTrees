@@ -114,7 +114,7 @@ public class TreePanel extends JPanel {
 		lineMap = new HashMap<JTextField, BranchLine>();
 		reverseLineMap = new HashMap<BranchLine, JTextField>();
 		this.setFont(this.getFont().deriveFont(size));
-		premises = addBranch(null, addFirstLine);
+		premises = addBranch(null, true);
 		undoStack = new ArrayDeque<Branch>(UNDO_STACK_SIZE);
 		redoStack = new ArrayDeque<Branch>(REDO_STACK_SIZE);
 		
@@ -399,7 +399,11 @@ public class TreePanel extends JPanel {
 		if (parent != null)
 			parent.addBranch(newBranch);
 		if (addFirstLine)
+		{
 			addLine(newBranch);
+			if (parent == null)
+				newBranch.getLine(0).setIsPremise(true);
+		}
 		moveComponents();
 		repaint();
 		return newBranch;

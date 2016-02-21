@@ -35,7 +35,7 @@ import perl.aaron.TruthTrees.logic.Statement;
 
 public class TruthTrees {
 	
-	public static final String version = "1.1";
+	public static final String version = "1.1.5-unstable";
 	public static final String errorLogDir = "logs/";
 	public static final String errorFrameName = "Truth Trees Error";
 	public static final String errorMessageErrorLogFile = "Error writing to log file";
