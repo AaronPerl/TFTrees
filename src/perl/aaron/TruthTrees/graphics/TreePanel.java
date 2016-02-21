@@ -44,6 +44,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.UndoableEditListener;
+import javax.swing.plaf.basic.BasicTextFieldUI;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
@@ -632,6 +633,17 @@ public class TreePanel extends JPanel {
 	private void makeTextFieldForLine(final BranchLine line, final Branch b, final boolean isTerminator)
 	{
 		final JTextField newField = new JTextField("");
+		newField.setUI(new BasicTextFieldUI() {
+			@Override
+			public void paintBackground(Graphics g)
+			{
+				super.paintBackground(g);
+				Color old = g.getColor();
+				g.setColor(getBackground());
+				g.fillRect(getX(), getY(), getWidth(), getHeight());
+				g.setColor(old);
+			}
+		});
 		if (line.getStatement() != null)
 			newField.setText(line.getStatement().toString());
 		if (isTerminator)
