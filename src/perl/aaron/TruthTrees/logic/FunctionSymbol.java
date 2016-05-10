@@ -7,10 +7,12 @@ import java.util.Set;
 
 public class FunctionSymbol extends LogicObject {
 	
+	private String symbol;
 	private List<LogicObject> arguments;
 	
-	public FunctionSymbol(List<LogicObject> arguments)
+	public FunctionSymbol(String symbol, List<LogicObject> arguments)
 	{
+		this.symbol = symbol;
 		Collections.copy(this.arguments, arguments);
 	}
 
@@ -22,6 +24,18 @@ public class FunctionSymbol extends LogicObject {
 			allVariables.addAll(obj.getVariables());
 		}
 		return allVariables;
+	}
+	
+	public String toString()
+	{
+		String argString = "";
+		for (int i = 0; i < arguments.size(); i++)
+		{
+			if (i > 0)
+				argString += ", ";
+			argString += arguments.get(0).toString();
+		}
+		return symbol + "(" + argString + ")";
 	}
 
 }
