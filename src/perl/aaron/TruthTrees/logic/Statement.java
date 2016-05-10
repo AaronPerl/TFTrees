@@ -1,5 +1,7 @@
 package perl.aaron.TruthTrees.logic;
 
+import java.util.Set;
+
 public abstract class Statement {
 	/**
 	 * Returns the statement as a string
@@ -22,4 +24,8 @@ public abstract class Statement {
 	{
 		return "("+toString()+")";
 	}
+	/**
+	 * Returns the list of unbound variables in this statement
+	 */
+	public abstract Set<String> getVariables();
 }

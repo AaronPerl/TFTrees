@@ -2,7 +2,9 @@ package perl.aaron.TruthTrees.logic;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Conjunction extends LogicalOperator {
 	/**
@@ -67,5 +69,15 @@ public class Conjunction extends LogicalOperator {
 				return false;
 		}
 		return true;
+	}
+
+	@Override
+	public Set<String> getVariables() {
+		Set<String> union = new LinkedHashSet<String>();
+		for (Statement curStatement : statements)
+		{
+			union.addAll(curStatement.getVariables());
+		}
+		return union;
 	}
 }

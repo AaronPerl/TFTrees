@@ -2,6 +2,7 @@ package perl.aaron.TruthTrees.logic;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class Negation extends LogicalOperator {
 
@@ -95,6 +96,11 @@ public class Negation extends LogicalOperator {
 		else if (negand instanceof AtomicStatement)
 			return true;
 		return false;
+	}
+
+	@Override
+	public Set<String> getVariables() {
+		return negand.getVariables();
 	}
 
 }
