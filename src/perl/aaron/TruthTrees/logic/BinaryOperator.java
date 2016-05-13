@@ -24,4 +24,13 @@ public abstract class BinaryOperator extends LogicalOperator {
 		return union;
 	}
 	
+	@Override
+	public Set<String> getConstants()
+	{
+		Set<String> union = new LinkedHashSet<String>();
+		union.addAll(statements.get(0).getConstants());
+		union.addAll(statements.get(1).getConstants());
+		return union;
+	}
+	
 }

@@ -3,6 +3,7 @@ package perl.aaron.TruthTrees;
 import java.awt.Color;
 import java.awt.FontMetrics;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -127,7 +128,10 @@ public class BranchLine {
 						}
 						curTotalSet.add(curBranchSet);
 					}
-					if (!((Decomposable)statement).verifyDecomposition(curTotalSet))
+					if (selectedLines.size() > 0 &&
+							!((Decomposable)statement).verifyDecomposition(curTotalSet,
+							parent.getConstants(),
+							parent.getConstantsBefore(selectedLines.iterator().next())))
 						return "Invalid decomposition of statement \"" + statement.toString() + "\"";
 				}
 				if (!usedLines.equals(selectedLines)) // extra lines that were unused
@@ -137,31 +141,69 @@ public class BranchLine {
 			}
 			else // non-branching decomposition (conjunction)
 			{
+				// A map of leaf branches to a list of statements in that branch and up that are selected
 				Map<Branch, List<Statement>> branchMap = new LinkedHashMap<Branch, List<Statement>>();
+				Set<Branch> selectedBranches = new LinkedHashSet<Branch>();
+				// Add all branches that contain selected lines
 				for (BranchLine curLine : selectedLines)
 				{
-					List<Statement> curList; 
+					selectedBranches.add(curLine.getParent());
+				}
+				for (BranchLine curLine : selectedLines)
+				{
+					List<Statement> curList = null;
+					// Check if this branch is in the map and add the statement to it
 					if (branchMap.containsKey(curLine.getParent()))
 						curList = branchMap.get(curLine.getParent());
-					else
+					else // Check for child branches and add this line to all of those
 					{
-						curList = new ArrayList<Statement>();
-						branchMap.put(curLine.getParent(), curList);
+						boolean foundChildren = false;
+						for (Branch curBranch : selectedBranches)
+						{
+							if (curBranch != curLine.getParent() && curBranch.isChildOf(curLine.getParent()))
+							{
+								System.out.println("Found child of " + curLine.getStatement());
+								foundChildren = true;
+								if (branchMap.containsKey(curBranch))
+								{
+									branchMap.get(curBranch).add(curLine.getStatement());
+								}
+								else
+								{
+									List<Statement> newList = new ArrayList<Statement>();
+									newList.add(curLine.getStatement());
+									branchMap.put(curBranch, newList);
+								}
+							}
+						}
+						if (!foundChildren)
+						{
+							curList = new ArrayList<Statement>();
+							branchMap.put(curLine.getParent(), curList);
+						}
 					}
-					curList.add(curLine.getStatement());
+					if (curList != null)
+						curList.add(curLine.getStatement());
 				}
 				for (Branch curBranch : branchMap.keySet())
 				{
 					List<List<Statement>> currentDecomp = new ArrayList<List<Statement>>();
 					currentDecomp.add(branchMap.get(curBranch));
-					if (!((Decomposable) statement).verifyDecomposition(currentDecomp))
+					if (!((Decomposable) statement).verifyDecomposition(currentDecomp,
+							curBranch.getConstants(),
+							curBranch.getConstantsBefore(selectedLines.iterator().next())))
 					{
 						return "Invalid decomposition of statement \"" + statement.toString() + "\"";
 					}
 				}
 				if (branchMap.size() == 0)
 				{
-					return "Statement \"" + statement.toString() + "\" has not been decomposed!";
+					List<List<Statement>> currentDecomp = Collections.emptyList();
+					Set<String> constants = Collections.emptySet();
+					if (!((Decomposable) statement).verifyDecomposition(currentDecomp,constants,constants))
+						return "Statement \"" + statement.toString() + "\" has not been decomposed!";
+					else
+						return null;
 				}
 				if(!BranchLine.satisfiesAllBranches(parent, branchMap.keySet()))
 				{
@@ -174,7 +216,7 @@ public class BranchLine {
 	
 	public static boolean satisfiesAllBranches(Branch root, Set<Branch> descendents)
 	{
-		if (descendents.contains(root) || root.isTerminated())
+		if (descendents.contains(root) || root.isClosed())
 			return true;
 		else
 		{

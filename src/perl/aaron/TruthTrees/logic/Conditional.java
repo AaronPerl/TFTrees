@@ -1,6 +1,7 @@
 package perl.aaron.TruthTrees.logic;
 
 import java.util.List;
+import java.util.Set;
 
 public class Conditional extends BinaryOperator {
 
@@ -11,7 +12,7 @@ public class Conditional extends BinaryOperator {
 	public String toString() {
 		return  statements.get(0).toStringParen()+ " \u2192 " +statements.get(1).toStringParen();
 	}
-	public boolean verifyDecomposition(List<List<Statement>> branches) {
+	public boolean verifyDecomposition(List<List<Statement>> branches, Set<String> constants, Set<String> constantsBefore) {
 		if (branches.size() != 2) // conditionals decompose into 2 branches (implication to a disjunction)
 			return false;
 		if (branches.get(0).size() != 1 || branches.get(1).size() != 1) // each branch should have 1 statement

@@ -26,4 +26,42 @@ public class Constant extends LogicObject {
 		return Collections.emptySet();
 	}
 
+	@Override
+	public Set<String> getConstants() {
+		return Collections.singleton(name);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (other instanceof Constant)
+		{
+			Constant otherConstant = (Constant) other;
+			return name.equals(otherConstant.name);
+		}
+		return false;
+	}
+
+	@Override
+	public Binding determineBinding(LogicObject unbound) {
+		if (unbound instanceof Variable)
+		{
+			return new Binding(this, (Variable) unbound);
+		}
+		else if (unbound instanceof Constant)
+		{
+			if (this.equals(unbound))
+			{
+				return Binding.EMPTY_BINDING;
+			}
+			else
+			{
+				return null;
+			}
+		}
+		else
+		{
+			return null;
+		}
+	}
+
 }

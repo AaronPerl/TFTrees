@@ -370,12 +370,52 @@ public class TreePanel extends JPanel {
 		return null;
 	}
 	
+	public String checkCompletion()
+	{
+		boolean isOpen = checkForOpenBranch(root);
+		boolean allClosed = checkForAllClosed(root);
+		if (isOpen || allClosed)
+			return null;
+		else
+			return "Not all branches are closed and no branch has been marked as open!";
+	}
+	
+	private boolean checkForOpenBranch(Branch b)
+	{
+		if (b.isOpen())
+			return true;
+		for (Branch child : b.getBranches())
+		{
+			if (checkForOpenBranch(child))
+				return true;
+		}
+		return false;
+	}
+	
+	private boolean checkForAllClosed(Branch b)
+	{
+		if (b.getBranches().size() == 0 && !b.isClosed())
+			return false;
+		for (Branch child : b.getBranches())
+		{
+			if (!checkForAllClosed(child))
+				return false;
+		}
+		return true;
+	}
+	
 	public String check()
 	{
 		String checkRet = checkBranch(premises);
 		if (checkRet != null)
 			return checkRet;
-		return checkBranch(root);
+		String branchVal = checkBranch(root);
+		if (branchVal != null)
+			return branchVal;
+		String completionVal = checkCompletion();
+		if (completionVal != null)
+			return completionVal;
+		return null;
 	}
 	
 	public String checkSelectedLine()
@@ -450,9 +490,15 @@ public class TreePanel extends JPanel {
 				  (SwingUtilities.isRightMouseButton(e) || e.isControlDown()))
 				{
 					if (selectedBranches.contains(myBranch))
+					{
 						selectedBranches.remove(myBranch);
-					else
+						myBranch.setDecomposedFrom(null);
+					}
+					else if (myBranch.getDecomposedFrom() == null)
+					{
 						selectedBranches.add(myBranch);
+						myBranch.setDecomposedFrom(editLine);
+					}
 					TreePanel.this.repaint();
 				}
 			}
@@ -542,7 +588,7 @@ public class TreePanel extends JPanel {
 			JButton terminateButton = terminateMap.get(b);
 			int horizontalOffset = (maxWidth + Branch.BRANCH_SEPARATION) * (b.getBranches().size()-1);
 			horizontalOffset /= -2;
-			if (!b.isTerminated())
+			if (!b.isClosed() && !b.isOpen())
 			{
 				lineButton.setBounds(origin.x - maxLineWidth/2, origin.y + verticalOffset,
 						maxLineWidth, b.getLineHeight());
@@ -620,11 +666,18 @@ public class TreePanel extends JPanel {
 	
 	private BranchLine addLine(final Branch b, final boolean isTerminator)
 	{
+		return addLine(b, isTerminator, true);
+	}
+	
+	private BranchLine addLine(final Branch b, final boolean isTerminator, final boolean isClose)
+	{
 		recordState();
 		final BranchLine newLine;
 		if (isTerminator)
 		{
 			newLine = new BranchTerminator(b);
+			if (!isClose)
+				((BranchTerminator)newLine).switchIsClose();
 			b.addTerminator((BranchTerminator)newLine);
 		}
 		else
@@ -670,6 +723,10 @@ public class TreePanel extends JPanel {
 					super.insertString(fb, offset, "\u2192", attr);
 				else if (string.equals("%"))
 					super.insertString(fb, offset, "\u2194", attr);
+				else if (string.equals("@"))
+					super.insertString(fb, offset, "\u2200", attr);
+				else if (string.equals("/"))
+					super.insertString(fb, offset, "\u2203", attr);
 				else
 					super.insertString(fb, offset, string, attr);
 			}
@@ -686,6 +743,10 @@ public class TreePanel extends JPanel {
 					super.replace(fb, offset, length, "\u2192", attrs);
 				else if (text.equals("%"))
 					super.replace(fb, offset, length, "\u2194", attrs);
+				else if (text.equals("@"))
+					super.replace(fb, offset, length, "\u2200", attrs);
+				else if (text.equals("/"))
+					super.replace(fb, offset, length, "\u2203", attrs);
 				else
 					super.replace(fb, offset, length, text, attrs);
 				
@@ -720,9 +781,17 @@ public class TreePanel extends JPanel {
 				else if (SwingUtilities.isRightMouseButton(e) || e.isControlDown())
 				{
 					BranchLine curLine = lineMap.get(newField);
-					if (editLine != curLine && editLine != null &&
-							(editLine == curLine.getDecomposedFrom() || curLine.getDecomposedFrom() == null || editLine instanceof BranchTerminator))
-						toggleSelected(curLine);
+					if (!isTerminator)
+					{
+						if (editLine != curLine && editLine != null &&
+								(editLine == curLine.getDecomposedFrom() || curLine.getDecomposedFrom() == null || editLine instanceof BranchTerminator))
+							toggleSelected(curLine);
+					}
+					else
+					{
+						((BranchTerminator)lineMap.get(newField)).switchIsClose();
+						newField.setText(lineMap.get(newField).toString());
+					}
 				}
 				
 			}
@@ -818,7 +887,12 @@ public class TreePanel extends JPanel {
 	
 	public BranchTerminator addTerminator(Branch b)
 	{
-		return (BranchTerminator) addLine(b, true);
+		return (BranchTerminator) addLine(b, true, true);
+	}
+	
+	public BranchTerminator addOpenTerminator(Branch b)
+	{
+		return (BranchTerminator) addLine(b, true, false);
 	}
 	
 	public void drawBranching(Branch b, Graphics2D g)
@@ -983,6 +1057,11 @@ public class TreePanel extends JPanel {
 		remove(terminateMap.get(b));
 		terminateMap.remove(b);
 		b.getRoot().removeBranch(b);
+		if (b.getRoot().getBranches().size() == 0 && b.getRoot().getDecomposedFrom() != null)
+			// This was the last child
+		{
+			b.getRoot().getDecomposedFrom().getSelectedBranches().remove(b.getRoot());
+		}
 	}
 	
 	/**
@@ -1004,6 +1083,11 @@ public class TreePanel extends JPanel {
 		moveComponents();
 		repaint();
 		return true;
+	}
+	
+	public void deleteFirstPremise()
+	{
+		removeLine(premises.getLine(0));
 	}
 	
 }

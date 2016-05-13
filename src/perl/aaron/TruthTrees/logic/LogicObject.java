@@ -8,4 +8,7 @@ import java.util.Set;
 public abstract class LogicObject {
 
 	public abstract Set<String> getVariables();
+	public abstract Set<String> getConstants();
+	public abstract boolean equals(Object other);
+	public abstract Binding determineBinding(LogicObject unbound);
 }

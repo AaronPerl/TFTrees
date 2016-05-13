@@ -75,7 +75,18 @@ public class FileManager {
 		Element curElement = (Element) node;
 		BranchLine newLine;
 		if (node.getNodeName().equals("Terminator"))
-			newLine = panel.addTerminator(curBranch);
+		{
+			String isClose = curElement.getAttribute("close");
+			if (isClose.equals("") || isClose.equals("true"))
+			{
+				newLine = panel.addTerminator(curBranch);
+			}
+			else
+			{
+				System.out.println("Open terminator");
+				newLine = panel.addOpenTerminator(curBranch);
+			}
+		}
 		else
 		{
 			String content = curElement.getAttribute("content");
@@ -186,6 +197,8 @@ public class FileManager {
 					selectedBranches.add(curDecomp);
 				}
 			}
+			newPanel.deleteFirstPremise();
+			newPanel.moveComponents();
 			return newPanel;
 		}
 		catch (ParserConfigurationException | SAXException | IOException e)
@@ -202,7 +215,11 @@ public class FileManager {
 			BranchLine curLine = curBranch.getLine(i);
 			Element curLineElement;
 			if (curLine instanceof BranchTerminator)
+			{
 				curLineElement = doc.createElement("Terminator");
+				curLineElement.setAttribute("close",
+						Boolean.toString(((BranchTerminator)curLine).isClose()));
+			}
 			else
 			{
 				curLineElement = doc.createElement("BranchLine");

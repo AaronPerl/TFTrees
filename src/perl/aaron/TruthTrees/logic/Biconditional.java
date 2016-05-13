@@ -11,7 +11,7 @@ public class Biconditional extends BinaryOperator {
 		super(a, b);
 	}
 
-	public boolean verifyDecomposition(List<List<Statement>> branches) {
+	public boolean verifyDecomposition(List<List<Statement>> branches, Set<String> constants, Set<String> constantsBefore) {
 		if (branches.size() != 2)
 			return false;
 		Conjunction AandB = new Conjunction(statements.get(0),statements.get(1));
@@ -20,8 +20,8 @@ public class Biconditional extends BinaryOperator {
 		branch1.add(branches.get(0));
 		List<List<Statement>> branch2 = new ArrayList<List<Statement>>();
 		branch2.add(branches.get(1));
-		return 	(AandB.verifyDecomposition(branch1) && NotAandNotB.verifyDecomposition(branch2)) ||
-				(AandB.verifyDecomposition(branch2) && NotAandNotB.verifyDecomposition(branch1));
+		return 	(AandB.verifyDecomposition(branch1, constants, constantsBefore) && NotAandNotB.verifyDecomposition(branch2, constants, constantsBefore)) ||
+				(AandB.verifyDecomposition(branch2, constants, constantsBefore) && NotAandNotB.verifyDecomposition(branch1, constants, constantsBefore));
 	}
 
 	public String toString() {

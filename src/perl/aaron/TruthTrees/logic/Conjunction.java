@@ -30,9 +30,10 @@ public class Conjunction extends LogicalOperator {
 		return statementString + statementsAL.get(statementsAL.size()-1).toStringParen();
 	}
 
-	public boolean verifyDecomposition(List< List<Statement> > branches) {
+	public boolean verifyDecomposition(List< List<Statement> > branches, Set<String> constants, Set<String> constantsBefore) {
 		if (branches.size() != 1) // There should be only 1 branch
 			return false;
+		System.out.println(branches.toString());
 		List<Statement> decomposedList = branches.get(0);
 		if (decomposedList.size() != statements.size()) // One decomposed statement per conjunct
 			return false;
@@ -77,6 +78,16 @@ public class Conjunction extends LogicalOperator {
 		for (Statement curStatement : statements)
 		{
 			union.addAll(curStatement.getVariables());
+		}
+		return union;
+	}
+
+	@Override
+	public Set<String> getConstants() {
+		Set<String> union = new LinkedHashSet<String>();
+		for (Statement curStatement : statements)
+		{
+			union.addAll(curStatement.getConstants());
 		}
 		return union;
 	}

@@ -1,11 +1,15 @@
 package perl.aaron.TruthTrees;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.swing.JOptionPane;
 
 import perl.aaron.TruthTrees.logic.*;
 
@@ -14,6 +18,9 @@ public class ExpressionParser {
 	
 	private static final ArrayList<Set<Character>> operators;
 	private static final String negationPattern;
+	private static final String variablePattern;
+	private static final String constantPattern;
+	private static final String quantifiers;
 //	private static final Pattern operatorPattern;
 	
 	static
@@ -41,6 +48,9 @@ public class ExpressionParser {
 		operators.add(disjunctions);
 		
 		negationPattern = "[\u00AC~!]";
+		variablePattern = "[t-z][0-9]*";
+		constantPattern = "[a-zA-Z0-9]+";
+		quantifiers = "[\u2200\u2203]";
 		
 //		operatorString = "";
 //		for (char curOperator : operators)
@@ -95,6 +105,40 @@ public class ExpressionParser {
 		return retVal;
 	}
 	
+	private static LogicObject parseObject(String objectString)
+	{
+		if (objectString.matches("[a-z][A-Z0-9]*\\(.+\\)"))
+		{
+			String symbol = objectString.substring(0, objectString.indexOf('('));
+//			System.out.println("Function symbol: " + symbol);
+			String argsString =
+				objectString.substring(
+					objectString.indexOf('(') + 1,
+					objectString.length() - 1);
+			List<String> argStrings = splitZeroDepth(argsString, Collections.singleton(','));
+			List<LogicObject> objs = new ArrayList<LogicObject>();
+			for (String curArgString : argStrings)
+			{
+				objs.add(parseObject(curArgString));
+			}
+			return new FunctionSymbol(symbol, objs);
+		}
+		else if (objectString.matches(variablePattern))
+		{
+//			System.out.println("Variable: " + objectString);
+			return new Variable(objectString);
+		}
+		else if (objectString.matches(constantPattern))
+		{
+//			System.out.println("Constant: " + objectString);
+			return new Constant(objectString);
+		}
+		else
+		{
+			return null;
+		}
+	}
+	
 	private static Statement recurseStatement(String subExpression)
 	{	
 		int operatorSet = -1;
@@ -119,6 +163,7 @@ public class ExpressionParser {
 		
 		if (operatorSet == -1)
 		{
+//			System.out.println(subExpression);
 			if (subExpression.matches("\\w+") || subExpression.matches("(\\w+)"))
 			{
 //				System.out.println("Atomic Statement : " + subExpression);
@@ -134,6 +179,78 @@ public class ExpressionParser {
 			{
 //				System.out.println("Negation of " + subExpression.substring(1));
 				return new Negation(recurseStatement(subExpression.substring(1)));
+			}
+			// Equality (not implemented)
+//			else if (subExpression.matches(".+=.+"))
+//			{
+//				int equalsPos = subExpression.indexOf('=');
+//				String obj1 = subExpression.substring(0, equalsPos);
+//				String obj2 = subExpression.substring(equalsPos + 1);
+//				
+//				return new Equality(parseObject(obj1), parseObject(obj2));
+//			}
+			else if (subExpression.matches("[A-Z][a-zA-Z0-9]*(.+)"))
+			{
+				String symbol = subExpression.substring(0, subExpression.indexOf('('));
+//				System.out.println("Predicate symbol: " + symbol);
+				String argumentsString =
+					subExpression.substring(
+						subExpression.indexOf('(') + 1,
+						subExpression.length() - 1);
+				List<String> objectStrings = splitZeroDepth(argumentsString, Collections.singleton(','));
+				List<LogicObject> arguments = new ArrayList<LogicObject>();
+				for (String curObjectString : objectStrings)
+				{
+					LogicObject newObj = parseObject(curObjectString);
+					if (newObj == null) return null;
+					arguments.add(newObj);
+				}
+				
+				return new Predicate(symbol, arguments);
+			}
+			// forall [var] ...
+			else if (subExpression.matches("\u2200" + variablePattern + ".+"))
+			{
+				Pattern p = Pattern.compile(variablePattern);
+				Matcher m = p.matcher(subExpression.substring(1));
+				m.find();
+				int start = m.start() + 1;
+				int end = m.end() + 1;
+				
+				String varString = subExpression.substring(start, end);
+				String statementString = subExpression.substring(end);
+				
+				Variable var = (Variable) parseObject(varString);
+				Statement statement = recurseStatement(statementString);
+				
+				if (var == null || statement == null) return null;
+				
+//				System.out.println("Univeral Quantifier:");
+//				System.out.println("\tQuantified Variable: " + var);
+//				System.out.println("\tQuantified Statement: " + statement);
+				return new UniversalQuantifier(var, statement);						
+			}
+			// exists [var] ...
+			else if (subExpression.matches("\u2203" + variablePattern + ".+"))
+			{
+				Pattern p = Pattern.compile(variablePattern);
+				Matcher m = p.matcher(subExpression.substring(1));
+				m.find();
+				int start = m.start() + 1;
+				int end = m.end() + 1;
+				
+				String varString = subExpression.substring(start, end);
+				String statementString = subExpression.substring(end);
+				
+				Variable var = (Variable) parseObject(varString);
+				Statement statement = recurseStatement(statementString);
+				
+				if (var == null || statement == null) return null;
+				
+//				System.out.println("Existential Quantifier:");
+//				System.out.println("\tQuantified Variable: " + var);
+//				System.out.println("\tQuantified Statement: " + statement);
+				return new ExistentialQuantifier(var, statement);						
 			}
 			return null;
 		}
@@ -177,7 +294,19 @@ public class ExpressionParser {
 	{
 //		if (checkForMismatchedParenthesis(expression))
 //			throw new ...
-		return recurseStatement(expression.replaceAll("\\s", ""));
+		Statement statement = recurseStatement(expression.replaceAll("\\s", ""));
+		if (statement != null)
+		{
+//			System.out.println("Expression: " + statement.toString());
+//			System.out.println("Constants: " + statement.getConstants());
+//			System.out.println("Variables: " + statement.getVariables());
+			if (statement.getVariables().size() != 0)
+			{
+				JOptionPane.showMessageDialog(null, "This statement has unbound variables: " +
+					statement.getVariables().toString());
+			}
+		}
+		return statement;
 	}
 
 }
