@@ -34,7 +34,8 @@ public class FunctionSymbol extends LogicObject {
 		{
 			allConstants.addAll(obj.getConstants());
 		}
-		allConstants.add(toString());
+		if (getVariables().size() == 0)
+			allConstants.add(toString());
 		return allConstants;
 	}
 	
